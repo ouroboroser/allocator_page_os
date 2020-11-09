@@ -13,8 +13,8 @@ const (
 	MEM_RESERVE = 0x2000;
 	MEM_RELEASE = 0x8000;
 	PAGE_EXECUTE_READWRITE = 0x40;
-	MEM = 200;
-	PAGE_SIZE = 40;
+	MEM = 10000;
+	PAGE_SIZE = 1000;
 )
 
 var (
@@ -44,7 +44,7 @@ func (allocator Allocator) requestMemory (value int, pages []Page, freeMemory in
 			fmt.Println("We need more than one page");
 		} else {
 			usedSpace := value;
-			freeSpace := 40 - usedSpace;
+			freeSpace := PAGE_SIZE - usedSpace;
 			page := Page{
 				startPage: startPage,
 				sizePage: PAGE_SIZE,
@@ -52,56 +52,56 @@ func (allocator Allocator) requestMemory (value int, pages []Page, freeMemory in
 				usedSpace: value,
 				freeSpace: freeSpace,
 			}
-
-			fmt.Printf("%+v\n", page);
-			fmt.Println("Current page test: ", page);
 			pages = append(pages, page);
-			fmt.Println("All current pages 2: ", pages);
 			freeMemory -= value;
 			return pages, freeMemory
 		}
 	} else {
-		fmt.Println("pages containt pages")
 		for i:=0; i < len(pages); i ++ {
-			fmt.Println(" =>", pages[i]);
+			fmt.Println("Work here")
+			if pages[i].currentBlockSize == value {
+				if pages[i].freeSpace < value {
+					fmt.Println("not enough memory")
+					usedSpace := value;
+					freeSpace := PAGE_SIZE - usedSpace;
+					page := Page{
+						startPage: startPage,
+						sizePage: PAGE_SIZE,
+						currentBlockSize: value,
+						usedSpace: value,
+						freeSpace: freeSpace,
+					}
+					pages = append(pages, page);
+					freeMemory -= value;
+					return pages, freeMemory
+				}
+
+			}
 
 			if pages[i].currentBlockSize == value {
-				fmt.Println("WE HAVE PAGE WITH CURRENT BLOCK SIZE", pages[i])
-				fmt.Println("SEEE", pages[i].currentBlockSize);
-				pages[i].usedSpace += value;
-				pages[i].freeSpace -= value;
-				freeMemory -= value;
-				return pages, freeMemory;
+				if pages[i].freeSpace > value {
+					pages[i].usedSpace += value;
+					pages[i].freeSpace -= value;
+					freeMemory -= value;
+					return pages, freeMemory;
+				}
 			}
+
 		}
 
 		for i:= 0; i < len(pages); i++ {
-			fmt.Println("pages", pages[i].currentBlockSize);
-			fmt.Println("VALUE", value);
-			fmt.Println("LOOP PAGE", pages[i]);
-			if pages[i].currentBlockSize == value {
-				fmt.Println("We have page with current block size", pages[i]);
-				fmt.Println("SEEE", pages[i].currentBlockSize);
-				pages[i].usedSpace += value;
-				pages[i].freeSpace -= value;
-				freeMemory -= value;
-				return pages, freeMemory;
-			} else {
-				fmt.Println("We need to divided new page")
-				usedSpace := value;
-				freeSpace := 40 - usedSpace;
-				page := Page{
-					startPage: startPage,
-					sizePage: PAGE_SIZE,
-					currentBlockSize: value,
-					usedSpace: value,
-					freeSpace: freeSpace,
-				}
-				pages = append(pages, page);
-				fmt.Println("All current pages 2: ", pages);
-				freeMemory -= value;
-				return pages, freeMemory
+			usedSpace := value;
+			freeSpace := PAGE_SIZE - usedSpace;
+			page := Page{
+				startPage: startPage,
+				sizePage: PAGE_SIZE,
+				currentBlockSize: value,
+				usedSpace: value,
+				freeSpace: freeSpace,
 			}
+			pages = append(pages, page);
+			freeMemory -= value;
+			return pages, freeMemory
 		}
 		return nil, 0
 	}
@@ -163,7 +163,7 @@ func main () {
 		pages = _pages;
 
 		for i:= 0; i < len(pages); i ++ {
-			fmt.Println("Page: ",i, pages[i]);
+			fmt.Printf("%+v\n", pages[i]);
 		}
 		fmt.Println("Free space:= ", freeMemory)
 
@@ -171,5 +171,4 @@ func main () {
 			addValue = false;
 		}
 	}
-
 }
