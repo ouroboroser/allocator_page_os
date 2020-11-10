@@ -58,12 +58,17 @@ func (allocator Allocator) requestMemory (value int, pages []Page, freeMemory in
 		}
 	} else {
 		for i:=0; i < len(pages); i ++ {
-			fmt.Println("Work here")
-			if pages[i].currentBlockSize == value {
+			fmt.Println("Work here 1")
+			if pages[i].currentBlockSize == value && pages[i].freeSpace > value {
+				_freeSpace := pages[i].freeSpace;
+				fmt.Println("FREE SPACE: ", _freeSpace);
 				if pages[i].freeSpace < value {
+					fmt.Println(pages);
+					fmt.Println("Free space: ", pages[i].freeSpace, "value: ", value);
 					fmt.Println("not enough memory")
 					usedSpace := value;
 					freeSpace := PAGE_SIZE - usedSpace;
+					fmt.Println("Word here 2")
 					page := Page{
 						startPage: startPage,
 						sizePage: PAGE_SIZE,
