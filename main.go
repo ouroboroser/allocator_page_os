@@ -38,100 +38,159 @@ func (allocator Allocator) memAlloc() (uintptr, error) {
 	}
 }
 
-func (allocator Allocator) requestMemory (value int, pages []Page, freeMemory int, startPage *byte) ([]Page, int){
+func (allocator Allocator) requestMemory (memory *[MEM]byte, value int, pages []Page, freeMemory int, startPage *byte) ([]Page, int, *byte){
+	var nextPage *byte;
+	if freeMemory < value {
+		fmt.Errorf("Not enough memory");
+		return nil, 0, nil;
+	}
 	if len(pages) == 0 {
 		if value > PAGE_SIZE {
-			fmt.Println("We need more than one page");
+			cutValue := float64(value)/float64(PAGE_SIZE) + 1;
+			cutValue = math.Round(cutValue);
+			g := int((PAGE_SIZE * cutValue));
+			next := &memory[g];
+			page := Page{
+				startPage: startPage,
+				nextPage: next,
+				sizePage: PAGE_SIZE,
+				currentBlockSize: value,
+				usedSpace: value,
+				freeSpace: 0,
+				status: "Diveded",
+			}
+			pages = append(pages, page);
+			freeMemory -= value;
+			return pages, freeMemory, nil
 		} else {
+			next := &memory[PAGE_SIZE];
 			usedSpace := value;
 			freeSpace := PAGE_SIZE - usedSpace;
+			page := Page{
+				startPage: startPage,
+				nextPage: next,
+				sizePage: PAGE_SIZE,
+				currentBlockSize: value,
+				usedSpace: value,
+				freeSpace: freeSpace,
+				status: "Diveded",
+			}
+			pages = append(pages, page);
+			freeMemory -= value;
+			return pages, freeMemory, next;
+		}
+	} else {
+		if value > PAGE_SIZE {
 			page := Page{
 				startPage: startPage,
 				sizePage: PAGE_SIZE,
 				currentBlockSize: value,
 				usedSpace: value,
-				freeSpace: freeSpace,
+				freeSpace: 0,
+				status: "Diveded",
 			}
-			pages = append(pages, page);
-			freeMemory -= value;
-			return pages, freeMemory
+			fmt.Println("Page: ", page);
 		}
-	} else {
 		for i:=0; i < len(pages); i ++ {
-			fmt.Println("Work here 1")
-			if pages[i].currentBlockSize == value && pages[i].freeSpace > value {
-				_freeSpace := pages[i].freeSpace;
-				fmt.Println("FREE SPACE: ", _freeSpace);
-				if pages[i].freeSpace < value {
-					fmt.Println(pages);
-					fmt.Println("Free space: ", pages[i].freeSpace, "value: ", value);
-					fmt.Println("not enough memory")
-					usedSpace := value;
-					freeSpace := PAGE_SIZE - usedSpace;
-					fmt.Println("Word here 2")
-					page := Page{
-						startPage: startPage,
-						sizePage: PAGE_SIZE,
-						currentBlockSize: value,
-						usedSpace: value,
-						freeSpace: freeSpace,
+			if value > PAGE_SIZE {
+			} else {
+				if pages[i].currentBlockSize == value && pages[i].freeSpace > value {
+					if pages[i].freeSpace < value {
+						page := Page{
+							startPage: startPage,
+							sizePage: PAGE_SIZE,
+							currentBlockSize: value,
+							usedSpace: value,
+							freeSpace: 1,
+							status: "Diveded",
+						}
+						pages = append(pages, page);
+						freeMemory -= value;
+						return pages, freeMemory, nextPage;
 					}
-					pages = append(pages, page);
-					freeMemory -= value;
-					return pages, freeMemory
-				}
 
+				}
 			}
+
 
 			if pages[i].currentBlockSize == value {
 				if pages[i].freeSpace > value {
 					pages[i].usedSpace += value;
 					pages[i].freeSpace -= value;
 					freeMemory -= value;
-					return pages, freeMemory;
+					return pages, freeMemory, nextPage;
 				}
 			}
 
 		}
-
 		for i:= 0; i < len(pages); i++ {
 			usedSpace := value;
 			freeSpace := PAGE_SIZE - usedSpace;
+			tmp := 0;
+			for i:= 0; i < MEM; i ++ {
+				if &memory[i] == startPage {
+					tmp = i;
+				}
+			}
+			nextPage = &memory[tmp+PAGE_SIZE+1];
+			var status string;
+			var t int;
+
+			if value > PAGE_SIZE {
+				t = 0;
+				status = "Multiple page block";
+			} else {
+				t = freeSpace;
+				status = "Diveded";
+			}
 			page := Page{
 				startPage: startPage,
+				nextPage: nextPage,
 				sizePage: PAGE_SIZE,
 				currentBlockSize: value,
 				usedSpace: value,
-				freeSpace: freeSpace,
+				freeSpace: t,
+				status: status,
 			}
 			pages = append(pages, page);
 			freeMemory -= value;
-			return pages, freeMemory
+			return pages, freeMemory, nextPage
 		}
-		return nil, 0
+		return nil, 0 , nextPage;
 	}
-	return nil, 0
+	return nil, 0, nextPage;
+}
+
+func (allocator Allocator) freeAlloc() error {
+	addr, _, msg := VirtualFree.Call(allocator.adress, 0 , MEM_RELEASE)
+	if addr == 0 {
+		fmt.Println(msg)
+		return msg;
+	} else {
+		fmt.Println(msg)
+		return nil
+	}
 }
 
 type Page struct {
 	startPage *byte;
-	//nextPage *byte;
+	nextPage *byte;
 	sizePage int;
 	currentBlockSize int;
 	usedSpace int;
 	freeSpace int;
-	//status string;
+	status string;
 }
 
-func (page *Page) Init(startPage *byte, sizePage int, currectBlockSize int,
-	usedSpace int, freeSpace int) {
+func (page *Page) Init(startPage *byte, nextPage *byte, sizePage int, currectBlockSize int,
+	usedSpace int, freeSpace int, status string) {
 	page.startPage = startPage;
-	//page.nextPage = nextPage;
+	page.nextPage = nextPage;
 	page.sizePage = sizePage;
 	page.currentBlockSize = currectBlockSize;
 	page.usedSpace = usedSpace;
 	page.freeSpace = freeSpace;
-	//page.status = "Free";
+	page.status = status;
 }
 
 func checkedSize (value float64) (float64){
@@ -153,7 +212,6 @@ func main () {
 	var freeMemory int;
 	freeMemory = MEM;
 	fmt.Println(allocator);
-	fmt.Println(memory);
 	var pages []Page;
 	var addValue bool;
 	addValue = true;
@@ -163,17 +221,18 @@ func main () {
 		fmt.Scan(&value);
 		next := checkedSize(value);
 		var converValue int = int(next);
-		//var pages []Page;
-		_pages, freeMemory := allocator.requestMemory(converValue, pages,freeMemory, _addr);
+		_pages, _freeMemory, _next := allocator.requestMemory(memory, converValue, pages,freeMemory, _addr);
+		_addr = _next;
+		freeMemory = _freeMemory;
 		pages = _pages;
 
 		for i:= 0; i < len(pages); i ++ {
 			fmt.Printf("%+v\n", pages[i]);
 		}
 		fmt.Println("Free space:= ", freeMemory)
-
-		if freeMemory < 0 {
+		if freeMemory == 0 {
 			addValue = false;
 		}
 	}
+	allocator.freeAlloc();
 }
